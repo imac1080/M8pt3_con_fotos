@@ -1,13 +1,16 @@
 package com.example.m8button;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
@@ -18,22 +21,29 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStreamWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
-    static final int REQUEST_IMAGE_CAPTURE = 1;
+    static final int REQUEST_TAKE_PHOTO = 1;
+    String currentPhotoPath;
+    File photoFile;
     int random = (int) (Math.random() * 50 + 1);
     static int intentos = 0;
     static String nom = null;
     static TextView textView2;
     static ArrayList<Persona> ListRanking = new ArrayList<Persona>();
     ImageView imageView2;
-    ;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,7 +89,8 @@ public class MainActivity extends AppCompatActivity {
                                         edit.setError("No pots deixar-ho buit");
                                         return;
                                     } else {
-                                        ListRanking.add(new Persona(nom, intentos));
+                                        dispatchTakePictureIntent();
+                                        ListRanking.add(new Persona(nom, intentos, Uri.parse(photoFile.toString())));
                                         nom = null;
                                         intentos = 0;
                                         GuardarArray(MainActivity.this);
@@ -131,6 +142,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void LeerArray(Context context) {
+
         try {
             File f = new File(context.getFilesDir(), "data.dat");
             if (f.exists()) {
@@ -141,9 +153,13 @@ public class MainActivity extends AppCompatActivity {
                 while (oos.available() > 0) {
                     String s = oos.readUTF();
                     int edat2 = oos.readInt();
-                    ListRanking.add(new Persona(s, edat2));
-                    Log.d("-------", "persona " + i + " puesta");
+                    String imagenStirng = oos.readUTF();
+
+
+                    ListRanking.add(new Persona(s, edat2, Uri.parse(imagenStirng)));
+                    Log.d("-------", "persona " + i + " puesta img: "+imagenStirng);
                     i++;
+
                 }
                 fout.close();
             }
@@ -154,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void GuardarArray(Context context) {
+
         try {
             File f = new File(context.getFilesDir(), "data.dat");
             FileOutputStream fout = new FileOutputStream(f);
@@ -161,33 +178,53 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < ListRanking.size(); i++) {
                 oos.writeUTF(ListRanking.get(i).nom);
                 oos.writeInt(ListRanking.get(i).qualificacio);
+                oos.writeUTF(ListRanking.get(i).getFotoRanking().toString());
                 Log.d("-------", "persona " + i + " puesta long de array: " + ListRanking.size());
             }
             oos.flush();
             fout.getFD().sync();
             fout.close();
-            //captura foto
-            Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
-            }
-
 
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            Bundle extras = data.getExtras();
-            Bitmap imageBitmap = (Bitmap) extras.get("data");
-            //ListRanking.get(ListRanking.size() - 1).imageView.setImageBitmap(imageBitmap);
-            imageView2.setImageBitmap(imageBitmap);
-            startActivity(new Intent(MainActivity.this, RankingActivity.class));
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
 
+        // Save a file: path for use with ACTION_VIEW intents
+        currentPhotoPath = image.getAbsolutePath();
+        return image;
+    }
+
+    private void dispatchTakePictureIntent() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Ensure that there's a camera activity to handle the intent
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            // Create the File where the photo should go
+            photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+            }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                Uri photoURI = FileProvider.getUriForFile(this, this.getApplicationContext().getPackageName() +
+                                ".fileprovider",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
+            }
         }
     }
 

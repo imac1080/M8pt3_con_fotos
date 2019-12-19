@@ -25,8 +25,8 @@ public class ListViewAdapter extends ArrayAdapter {
         }
 
         TextView nomPersona = view.findViewById(R.id.nomTextView);
-        TextView intentsPersona = view.findViewById(R.id.intentosTextView);
-        ImageView fotoPersona = view.findViewById(R.id.perfilImageView);
+        TextView intentsPersona = view.findViewById(R.id.intentsTextView);
+        ImageView fotoPersona = view.findViewById(R.id.personaImageView);
 
 
         fotoPersona.setImageURI(persona.getFotoRanking());
